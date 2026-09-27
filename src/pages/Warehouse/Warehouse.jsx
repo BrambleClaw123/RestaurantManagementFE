@@ -3,14 +3,14 @@ import MainLayout from '../../components/layout/MainLayout';
 
 // --- MOCK DATA ---
 const MATERIALS_DATA = [
-  { code: 'NVL-BEEF-01', name: 'Thịt thăn bò Úc', note: 'Bảo quản ngăn đông (-18°C)', unit: 'kg', stock: 45.5, status: 'Còn hàng' },
-  { code: 'NVL-RICE-02', name: 'Gạo thơm ST25', note: 'Kho khô tầng 1', unit: 'kg', stock: 120.0, status: 'Còn hàng' },
-  { code: 'NVL-EGG-03', name: 'Trứng gà Ba Huân', note: 'Ngăn mát kho gia vị', unit: 'quả', stock: 35, status: 'Sắp hết' },
-  { code: 'NVL-OIL-04', name: 'Dầu ăn Simply 5L', note: 'Kho thực phẩm khô', unit: 'bình', stock: 18, status: 'Còn hàng' },
-  { code: 'NVL-BUTTER-05', name: 'Bơ lạt Anchor 1kg', note: 'Kho bơ sữa mát (4°C)', unit: 'khối', stock: 0.0, status: 'Hết hàng' },
-  { code: 'NVL-MILK-06', name: 'Sữa tươi thanh trùng Đà Lạt Milk', note: 'Kho bảo quản lạnh', unit: 'lít', stock: 32.0, status: 'Còn hàng' },
-  { code: 'NVL-SHRIMP-07', name: 'Tôm sú biển tươi sống', note: 'Bể sục hải sản tươi', unit: 'kg', stock: 14.2, status: 'Còn hàng' },
-  { code: 'NVL-MUSH-08', name: 'Nấm hương rừng khô', note: 'Kệ gia vị khô số 4', unit: 'kg', stock: 3.5, status: 'Sắp hết' }
+  { code: 'NVL-BEEF-01', name: 'Thịt thăn bò Úc', unit: 'kg', stock: 45.5, status: 'Còn hàng' },
+  { code: 'NVL-RICE-02', name: 'Gạo thơm ST25', unit: 'kg', stock: 120.0, status: 'Còn hàng' },
+  { code: 'NVL-EGG-03', name: 'Trứng gà Ba Huân', unit: 'quả', stock: 35, status: 'Sắp hết' },
+  { code: 'NVL-OIL-04', name: 'Dầu ăn Simply 5L', unit: 'bình', stock: 18, status: 'Còn hàng' },
+  { code: 'NVL-BUTTER-05', name: 'Bơ lạt Anchor 1kg', unit: 'khối', stock: 0.0, status: 'Hết hàng' },
+  { code: 'NVL-MILK-06', name: 'Sữa tươi thanh trùng Đà Lạt Milk', unit: 'lít', stock: 32.0, status: 'Còn hàng' },
+  { code: 'NVL-SHRIMP-07', name: 'Tôm sú biển tươi sống', unit: 'kg', stock: 14.2, status: 'Còn hàng' },
+  { code: 'NVL-MUSH-08', name: 'Nấm hương rừng khô', unit: 'kg', stock: 3.5, status: 'Sắp hết' }
 ];
 
 const AVAILABLE_MATERIALS = [
@@ -54,6 +54,12 @@ export default function Warehouse() {
   const [isMaterialModalOpen, setIsMaterialModalOpen] = useState(false);
   const [editingMaterial, setEditingMaterial] = useState(null);
   const [newMaterial, setNewMaterial] = useState({ name: '', unit: 'kg' });
+  const handleDeleteMaterial = (code, name) => {
+    if (window.confirm(`Bạn có chắc chắn muốn xóa nguyên vật liệu "${name}"?`)) {
+      setMaterials(prev => prev.filter(m => m.code !== code));
+      showToast('Đã xóa nguyên vật liệu', `Đã xóa thành công ${name} khỏi danh mục.`);
+    }
+  };
 
   // TAB 2: RECEIPT STATES
   const [supplier, setSupplier] = useState('megafood');
@@ -101,10 +107,14 @@ export default function Warehouse() {
       return;
     }
 
+    if (materials.some(m => m.name.toLowerCase() === name.toLowerCase())) {
+      showToast('Không thể thêm nguyên vật liệu', 'Tên nguyên vật liệu này đã tồn tại.', true);
+      return;
+    }
+
     const createdMaterial = {
       code: `NVL-NEW-${Date.now().toString(36).toUpperCase()}`,
       name,
-      note: '',
       unit: newMaterial.unit,
       stock: 0,
       status: 'Hết hàng',
@@ -142,13 +152,41 @@ export default function Warehouse() {
           : row
         )
       }));
+      setReceiptList(prev => prev.map(receipt => ({
+        ...receipt,
+        rows: receipt.rows.map(row => row.matName === previousMaterial.name
+          ? { ...row, matName: name, unit: editingMaterial.unit }
+          : row
+        )
+      })));
     }
     setEditingMaterial(null);
     showToast('Đã cập nhật nguyên vật liệu', `${name} đã được cập nhật thành công.`);
   };
 
   // --- TAB 2 LOGIC ---
+  const handleStartNewReceipt = () => {
+    setEditingReceiptId(null);
+    setSupplier('megafood');
+    setImportReason('Nhập kho định kỳ đầu tuần');
+    if (materials.length > 0) {
+      const defaultMat = materials[0];
+      setReceiptRows([
+        { id: 1, matName: defaultMat.name, unit: defaultMat.unit, quantity: 10, price: defaultMat.defaultPrice }
+      ]);
+      setRowSequence(2);
+    } else {
+      setReceiptRows([]);
+      setRowSequence(1);
+    }
+    setActiveTab('receipt');
+  };
+
   const handleAddReceiptRow = () => {
+    if (materials.length === 0) {
+      showToast('Lỗi Thêm Dòng', 'Chưa có nguyên vật liệu nào trong danh mục!', true);
+      return;
+    }
     const defaultMat = materials[0];
     setReceiptRows([...receiptRows, { id: rowSequence, matName: defaultMat.name, unit: defaultMat.unit, quantity: 10, price: defaultMat.defaultPrice }]);
     setRowSequence(prev => prev + 1);
@@ -188,6 +226,13 @@ export default function Warehouse() {
       showToast('Lỗi Lưu Phiếu', 'Vui lòng thêm ít nhất một nguyên vật liệu vào phiếu nhập!', true);
       return;
     }
+
+    const hasInvalidQty = receiptRows.some(row => !row.quantity || Number(row.quantity) <= 0);
+    if (hasInvalidQty) {
+      showToast('Lỗi Số Lượng', 'Số lượng nhập của các mặt hàng phải lớn hơn 0!', true);
+      return;
+    }
+
     const savedReceipt = {
       id: editingReceiptId || Date.now(),
       supplier,
@@ -196,6 +241,24 @@ export default function Warehouse() {
       total: receiptGrandTotal,
       rows: receiptRows
     };
+
+    // Tăng tồn kho và cập nhật trạng thái nếu là tạo phiếu mới
+    if (!editingReceiptId) {
+      setMaterials(prevMaterials => prevMaterials.map(m => {
+        const addedQty = receiptRows
+          .filter(row => row.matName === m.name)
+          .reduce((sum, row) => sum + Number(row.quantity || 0), 0);
+        if (addedQty > 0) {
+          const newStock = m.stock + addedQty;
+          return {
+            ...m,
+            stock: newStock,
+            status: newStock <= 0 ? 'Hết hàng' : newStock <= 10 ? 'Sắp hết' : 'Còn hàng'
+          };
+        }
+        return m;
+      }));
+    }
 
     setReceiptList(prev => editingReceiptId
       ? prev.map(receipt => receipt.id === editingReceiptId ? savedReceipt : receipt)
@@ -251,8 +314,10 @@ export default function Warehouse() {
   };
 
   const handleDeleteReceipt = (receiptId) => {
-    setReceiptList(prev => prev.filter(receipt => receipt.id !== receiptId));
-    showToast('Đã Xóa Phiếu Nhập Kho', 'Phiếu nhập đã được xóa khỏi danh sách.');
+    if (window.confirm('Bạn có chắc chắn muốn xóa phiếu nhập kho này?')) {
+      setReceiptList(prev => prev.filter(receipt => receipt.id !== receiptId));
+      showToast('Đã Xóa Phiếu Nhập Kho', 'Phiếu nhập đã được xóa khỏi danh sách.');
+    }
   };
 
   const filteredReceipts = receiptList.filter(receipt =>
@@ -391,7 +456,7 @@ export default function Warehouse() {
               <button onClick={() => setIsMaterialModalOpen(true)} className="inline-flex items-center px-3.5 py-2 text-xs font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-colors shadow-sm">
                 <svg className="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path></svg> Thêm NVL
               </button>
-              <button onClick={() => setActiveTab('receipt')} className="inline-flex items-center px-3.5 py-2 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-sm">
+              <button onClick={handleStartNewReceipt} className="inline-flex items-center px-3.5 py-2 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-sm">
                 <svg className="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path></svg> Lập phiếu nhập
               </button>
             </div>
@@ -402,27 +467,30 @@ export default function Warehouse() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                    <th className="py-3 px-4">Tên nguyên vật liệu</th><th className="py-3 px-4">Mã vật tư</th><th className="py-3 px-4 text-center">Đơn vị</th><th className="py-3 px-4 text-right">Số lượng tồn</th><th className="py-3 px-4 text-center">Trạng thái</th>
+                    <th className="py-3 px-4">Tên nguyên vật liệu</th><th className="py-3 px-4">Mã vật tư</th><th className="py-3 px-4 text-center">Đơn vị</th><th className="py-3 px-4 text-right">Số lượng tồn</th><th className="py-3 px-4 text-center">Trạng thái</th><th className="py-3 px-4 text-center">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-sm">
                   {filteredMaterials.map(m => (
                     <tr key={m.code} className={`hover:bg-slate-50/70 transition-colors ${m.status === 'Sắp hết' ? 'bg-amber-50/30' : m.status === 'Hết hàng' ? 'bg-rose-50/30' : ''}`}>
-                      <td className="py-3 px-4"><div className="font-semibold text-slate-800">{m.name}</div><div className="text-xs text-slate-400">{m.note}</div></td>
+                      <td className="py-3 px-4"><div className="font-semibold text-slate-800">{m.name}</div></td>
                       <td className="py-3 px-4 font-mono text-xs text-slate-500">{m.code}</td>
                       <td className="py-3 px-4 text-center text-slate-600 font-medium">{m.unit}</td>
                       <td className={`py-3 px-4 text-right font-mono font-bold ${m.status === 'Sắp hết' ? 'text-amber-700' : m.status === 'Hết hàng' ? 'text-rose-600' : 'text-slate-800'}`}>{m.stock.toFixed(1)}</td>
                       <td className="py-3 px-4 text-center">
+                        {m.status === 'Còn hàng' && <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">Còn hàng</span>}
+                        {m.status === 'Sắp hết' && <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">Sắp hết</span>}
+                        {m.status === 'Hết hàng' && <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-rose-50 text-rose-700 border border-rose-200">Hết hàng</span>}
+                      </td>
+                      <td className="py-3 px-4 text-center">
                         <div className="flex items-center justify-center gap-2">
-                          {m.status === 'Còn hàng' && <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">Còn hàng</span>}
-                          {m.status === 'Sắp hết' && <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">Sắp hết</span>}
-                          {m.status === 'Hết hàng' && <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-rose-50 text-rose-700 border border-rose-200">Hết hàng</span>}
                           <button type="button" onClick={() => setEditingMaterial({ code: m.code, name: m.name, unit: m.unit })} className="px-2.5 py-1 text-xs font-semibold text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors">Sửa</button>
+                          <button type="button" onClick={() => handleDeleteMaterial(m.code, m.name)} className="px-2.5 py-1 text-xs font-semibold text-rose-600 bg-rose-50 border border-rose-200 rounded-md hover:bg-rose-100 transition-colors">Xóa</button>
                         </div>
                       </td>
                     </tr>
                   ))}
-                  {filteredMaterials.length === 0 && <tr><td colSpan="5" className="py-6 text-center text-slate-400 text-sm">Không tìm thấy vật tư phù hợp.</td></tr>}
+                  {filteredMaterials.length === 0 && <tr><td colSpan="6" className="py-6 text-center text-slate-400 text-sm">Không tìm thấy vật tư phù hợp.</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -441,7 +509,7 @@ export default function Warehouse() {
               <h2 className="text-lg font-bold text-slate-900">Quản Lý Danh Sách Phiếu Nhập Kho</h2>
               <p className="text-xs text-slate-500 mt-0.5">Theo dõi và chỉnh sửa các phiếu nhập kho đã lưu.</p>
             </div>
-            <button onClick={() => { setEditingReceiptId(null); setActiveTab('receipt'); }} className="inline-flex items-center px-3.5 py-2 text-xs font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-sm">
+            <button onClick={handleStartNewReceipt} className="inline-flex items-center px-3.5 py-2 text-xs font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-sm">
               <svg className="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path></svg>
               Lập phiếu nhập mới
             </button>
@@ -617,7 +685,7 @@ export default function Warehouse() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
               <div><p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Tổng mặt hàng</p><h3 className="text-2xl font-bold text-slate-900 mt-1">{filteredReportData.length} <span className="text-xs font-normal text-slate-500">vật tư</span></h3></div>
-              <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center"><svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="m7.5 4.27 9 5.15"></path><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path></svg></div>
+              <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center"><svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="m7.5 4.27 9 5.15"></path><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path><path d="m3.3 7 8.7 5 8.7-5"></path><path d="M12 22V12"></path></svg></div>
             </div>
             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
               <div><p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Tổng giá trị đã nhập (VNĐ)</p><h3 className="text-2xl font-bold text-emerald-600 mt-1">+{formatCurrency(reportTotals.importedValue)}</h3></div>
